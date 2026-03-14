@@ -280,11 +280,16 @@ function renderActive(role, container) {
     container.innerHTML = "<p>Sem carta ativa.</p>";
     return;
   }
-  container.appendChild(renderCard(player.activeCard, {
+  const card = renderCard(player.activeCard, {
     active: true,
     owner: role,
     evolveFlash: state.evolveFlash[role]
-  }));
+  });
+  const evoInfo = document.createElement("p");
+  evoInfo.className = "small-note";
+  evoInfo.textContent = `Evolução disponível: ${player.evolutionAvailable ? "Sim" : "Não"} | Nível: ${player.evolutionLevel ?? 0}`;
+  container.appendChild(card);
+  container.appendChild(evoInfo);
 }
 
 function renderHand(role, container) {
@@ -315,13 +320,13 @@ function renderScoreboard() {
     <div class="score-item">
       <strong>${p1.name}</strong><br/>
       Deck: ${p1.deckCount} | Mão: ${p1.handCount} | Descarte: ${p1.discardCount}<br/>
-      Energia Pool: ${p1.energyPool} | KOs: ${p1.knockouts}<br/>
+      Energia Pool: ${p1.energyPool} | KOs: ${p1.knockouts} | Nível Evo: ${p1.evolutionLevel ?? 0}<br/>
       Ranking da Sala: ${rank.player1Wins} vitória(s)
     </div>
     <div class="score-item">
       <strong>${p2.name}</strong><br/>
       Deck: ${p2.deckCount} | Mão: ${p2.handCount} | Descarte: ${p2.discardCount}<br/>
-      Energia Pool: ${p2.energyPool} | KOs: ${p2.knockouts}<br/>
+      Energia Pool: ${p2.energyPool} | KOs: ${p2.knockouts} | Nível Evo: ${p2.evolutionLevel ?? 0}<br/>
       Ranking da Sala: ${rank.player2Wins} vitória(s)
     </div>
     <div class="score-item score-draws">
@@ -448,9 +453,13 @@ function renderControls() {
   const disabledByTurn = !connected || !state.snapshot?.ready || !mine || Boolean(state.snapshot?.winner);
   const deckSel = state.snapshot?.deckSelection || {};
   const bothDecksReady = Boolean(deckSel.myDeckReady && deckSel.opponentDeckReady);
+  const canEvolveNow = Boolean(me?.evolutionAvailable);
 
   el.newGameBtn.disabled = !connected || state.connection.role !== "player1" || !bothDecksReady;
-  el.evolveBtn.disabled = disabledByTurn || !(state.snapshot?.settings?.evolutionEnabled ?? true);
+  el.evolveBtn.disabled =
+    disabledByTurn ||
+    !(state.snapshot?.settings?.evolutionEnabled ?? true) ||
+    !canEvolveNow;
   el.attachEnergyBtn.disabled = disabledByTurn;
   el.attackBtn.disabled = disabledByTurn;
   el.endTurnBtn.disabled = disabledByTurn;
@@ -463,7 +472,15 @@ function renderControls() {
   el.evolutionRuleToggle.checked = Boolean(state.snapshot?.settings?.evolutionEnabled ?? true);
 
   el.energyInfo.textContent = `Energia no pool: ${me?.energyPool ?? "-"}`;
-  el.turnLockInfo.textContent = mine ? "Ações liberadas para você." : "Ações bloqueadas: aguarde seu turno.";
+  if (!mine) {
+    el.turnLockInfo.textContent = "Ações bloqueadas: aguarde seu turno.";
+  } else if (!(state.snapshot?.settings?.evolutionEnabled ?? true)) {
+    el.turnLockInfo.textContent = "Evolução desativada na regra da partida.";
+  } else if (!canEvolveNow) {
+    el.turnLockInfo.textContent = "Evolução indisponível: ganhe níveis derrotando cartas.";
+  } else {
+    el.turnLockInfo.textContent = "Ações liberadas para você.";
+  }
 
   const rematchVotes = state.snapshot?.rematchVotes || { player1: false, player2: false };
   const votesCount = Number(rematchVotes.player1) + Number(rematchVotes.player2);

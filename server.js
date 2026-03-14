@@ -192,6 +192,7 @@ function makeEmptyPlayer(name) {
     energyPool: 0,
     hasAttackedThisTurn: false,
     hasEvolvedThisTurn: false,
+    evolutionLevel: 0,
     knockouts: 0
   };
 }
@@ -325,6 +326,13 @@ function sanitizePlayer(game, role, viewerRole) {
   const player = game.players[role];
   const me = role === viewerRole;
   const active = getActive(player);
+  const evolutionAvailable = Boolean(
+    game.settings?.evolutionEnabled &&
+    active &&
+    active.evolvesTo &&
+    player.evolutionLevel >= 1 &&
+    !player.hasEvolvedThisTurn
+  );
 
   return {
     name: player.name,
@@ -333,6 +341,8 @@ function sanitizePlayer(game, role, viewerRole) {
     hiddenHandCount: me ? 0 : player.hand.length,
     discardCount: player.discard.length,
     energyPool: player.energyPool,
+    evolutionLevel: player.evolutionLevel,
+    evolutionAvailable,
     knockouts: player.knockouts,
     activeCardId: player.activeCardId,
     selectedAttackIndex: me ? player.selectedAttackIndex : 0,
@@ -419,6 +429,14 @@ function ensureReady(session) {
   return null;
 }
 
+function findDeckCardByName(name) {
+  for (const deck of Object.values(DECK_LIBRARY)) {
+    const found = deck.cards.find((card) => card.name === name);
+    if (found) return found;
+  }
+  return null;
+}
+
 function handleAction(session, role, action, payload = {}) {
   const game = session.game;
   if (!game) return "Partida não iniciada.";
@@ -481,7 +499,9 @@ function handleAction(session, role, action, payload = {}) {
 
     if (defender.currentHp <= 0) {
       player.knockouts += 1;
+      player.evolutionLevel += 1;
       pushLog(game, `${defender.name} foi derrotado.`);
+      pushLog(game, `${player.name} ganhou +1 nível de evolução (total: ${player.evolutionLevel}).`);
       removeDefeatedActive(game, enemyRole);
       if (!game.players[enemyRole].activeCardId) {
         game.winner = role;
@@ -497,39 +517,35 @@ function handleAction(session, role, action, payload = {}) {
   if (action === "EVOLVE_ACTIVE") {
     if (!game.settings?.evolutionEnabled) return "Regra de evolução está desativada nesta partida.";
     if (player.hasEvolvedThisTurn) return "Você já evoluiu neste turno.";
+    if (player.evolutionLevel < 1) return "Nível de evolução insuficiente. Derrote cartas para evoluir.";
 
     const active = getActive(player);
     if (!active) return "Sem carta ativa para evoluir.";
+    if (!active.evolvesTo) return "Essa carta não possui evolução.";
 
-    const target = player.hand.find((card) => card.uid !== active.uid && card.evolvesFrom === active.name);
-    if (!target) return "Nenhuma evolução disponível para a carta ativa.";
+    const targetBase = findDeckCardByName(active.evolvesTo);
+    if (!targetBase) return "Evolução não encontrada na base de cartas.";
 
     const oldActiveName = active.name;
     const oldActiveUid = active.uid;
     const oldIndex = player.hand.findIndex((c) => c.uid === oldActiveUid);
-    const targetIndex = player.hand.findIndex((c) => c.uid === target.uid);
-
-    if (oldIndex < 0 || targetIndex < 0) return "Falha ao evoluir carta ativa.";
-
-    const targetCard = player.hand[targetIndex];
+    if (oldIndex < 0) return "Falha ao evoluir carta ativa.";
+    const targetCard = instantiateCard(
+      buildDeckCard(targetBase, 0, "evo"),
+      oldActiveUid
+    );
 
     targetCard.currentHp = Math.max(targetCard.currentHp, targetCard.hp - Math.max(0, active.hp - active.currentHp));
     targetCard.energyAttached = clone(active.energyAttached);
     targetCard.uid = oldActiveUid;
-
-    if (oldIndex > targetIndex) {
-      player.hand.splice(oldIndex, 1);
-      player.hand.splice(targetIndex, 1);
-    } else {
-      player.hand.splice(targetIndex, 1);
-      player.hand.splice(oldIndex, 1);
-    }
+    player.hand.splice(oldIndex, 1);
 
     player.hand.push(targetCard);
     player.activeCardId = targetCard.uid;
     player.hasEvolvedThisTurn = true;
+    player.evolutionLevel -= 1;
 
-    pushLog(game, `${player.name} evoluiu ${oldActiveName} para ${targetCard.name}.`);
+    pushLog(game, `${player.name} evoluiu ${oldActiveName} para ${targetCard.name} (nível restante: ${player.evolutionLevel}).`);
     return null;
   }
 
