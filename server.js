@@ -367,7 +367,15 @@ function sanitizeState(session, viewerRole) {
     deckSelection: {
       options: viewerDeckOptions.map((deckId) => ({
         id: deckId,
-        label: DECK_LIBRARY[deckId]?.label || deckId
+        label: DECK_LIBRARY[deckId]?.label || deckId,
+        preview: (getDeckTemplates(deckId) || []).map((card) => ({
+          name: card.name,
+          image: card.image,
+          type: card.types?.[0] || "colorless",
+          stage: card.stage || "basic",
+          evolvesFrom: card.evolvesFrom || null,
+          evolvesTo: card.evolvesTo || null
+        }))
       })),
       selected: selectedMine,
       myDeckReady: Boolean(selectedMine),

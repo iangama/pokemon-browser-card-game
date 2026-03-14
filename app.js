@@ -6,8 +6,10 @@ const el = {
   roomCodeInput: document.getElementById("roomCodeInput"),
   createRoomBtn: document.getElementById("createRoomBtn"),
   joinRoomBtn: document.getElementById("joinRoomBtn"),
+  leaveRoomBtn: document.getElementById("leaveRoomBtn"),
   connectionInfo: document.getElementById("connectionInfo"),
   deckOptions: document.getElementById("deckOptions"),
+  deckPreview: document.getElementById("deckPreview"),
   deckStatus: document.getElementById("deckStatus"),
   evolutionRuleToggle: document.getElementById("evolutionRuleToggle"),
   statusText: document.getElementById("statusText"),
@@ -133,6 +135,7 @@ function updateConnectionInfo() {
 function clearBoard() {
   el.scoreboard.innerHTML = "";
   el.deckOptions.innerHTML = "";
+  el.deckPreview.innerHTML = "";
   el.player1Active.innerHTML = "";
   el.player2Active.innerHTML = "";
   el.player1Hand.innerHTML = "";
@@ -142,6 +145,19 @@ function clearBoard() {
   el.chatList.innerHTML = "";
   el.typingIndicator.textContent = "";
   el.rematchBtn.hidden = true;
+}
+
+function leaveRoom() {
+  if (state.pollId) {
+    clearInterval(state.pollId);
+    state.pollId = null;
+  }
+  state.connection = null;
+  state.snapshot = null;
+  state.prevSnapshot = null;
+  state.lastChatHead = "";
+  saveConnection();
+  render();
 }
 
 function ensureAudioContext() {
@@ -318,6 +334,7 @@ function renderDeckSelection() {
   const ds = state.snapshot?.deckSelection;
   if (!ds) {
     el.deckOptions.innerHTML = "";
+    el.deckPreview.innerHTML = "";
     el.deckStatus.textContent = "Sem dados de deck.";
     return;
   }
@@ -330,6 +347,23 @@ function renderDeckSelection() {
     btn.setAttribute("data-deck-id", deck.id);
     btn.innerHTML = `<strong>${deck.label}</strong><br/><small>ID: ${deck.id}</small>`;
     el.deckOptions.appendChild(btn);
+  }
+
+  const selectedDeck = (ds.options || []).find((opt) => opt.id === ds.selected) || (ds.options || [])[0] || null;
+  el.deckPreview.innerHTML = "";
+  if (selectedDeck) {
+    for (const card of selectedDeck.preview || []) {
+      const item = document.createElement("article");
+      item.className = "deck-preview-card";
+      item.innerHTML = `
+        <img src="${card.image}" alt="${card.name}" loading="lazy" />
+        <strong>${card.name}</strong>
+        <small>Tipo: ${capitalize(card.type)}</small>
+        <small>Evolui de: ${card.evolvesFrom || "-"}</small>
+        <small>Evolui para: ${card.evolvesTo || "-"}</small>
+      `;
+      el.deckPreview.appendChild(item);
+    }
   }
 
   const myReady = ds.myDeckReady ? "você já escolheu seu deck" : "você ainda não escolheu seu deck";
@@ -525,6 +559,7 @@ function startPolling() {
 
 async function createRoom() {
   const name = (el.playerNameInput.value || "Jogador 1").trim();
+  if (state.connection) leaveRoom();
   ensureAudioContext();
   await ensureNotificationPermission();
   try {
@@ -549,6 +584,7 @@ async function createRoom() {
 
 async function joinRoom() {
   const name = (el.playerNameInput.value || "Jogador 2").trim();
+  if (state.connection) leaveRoom();
   ensureAudioContext();
   await ensureNotificationPermission();
   const code = (el.roomCodeInput.value || "").trim().toUpperCase();
@@ -664,6 +700,7 @@ function onChatInputChange() {
 function bindEvents() {
   el.createRoomBtn.addEventListener("click", createRoom);
   el.joinRoomBtn.addEventListener("click", joinRoom);
+  el.leaveRoomBtn.addEventListener("click", leaveRoom);
   el.newGameBtn.addEventListener("click", startMatch);
   el.evolveBtn.addEventListener("click", () => sendAction("EVOLVE_ACTIVE"));
   el.attachEnergyBtn.addEventListener("click", () => sendAction("ATTACH_ENERGY"));
