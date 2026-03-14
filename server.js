@@ -74,41 +74,102 @@ function isTypeAdvantage(attackerType, defenderType) {
   return TYPE_ADVANTAGE[atk]?.includes(def) || false;
 }
 
-function emergencyTemplates(total = 16) {
-  const base = [
-    { dex: 25, name: "Pikachu", type: "electric" },
-    { dex: 6, name: "Charizard", type: "fire" },
-    { dex: 9, name: "Blastoise", type: "water" },
-    { dex: 3, name: "Venusaur", type: "grass" },
-    { dex: 94, name: "Gengar", type: "psychic" },
-    { dex: 149, name: "Dragonite", type: "dragon" },
-    { dex: 143, name: "Snorlax", type: "colorless" },
-    { dex: 68, name: "Machamp", type: "fighting" }
-  ];
-
-  const out = [];
-  for (let i = 0; i < total; i += 1) {
-    const b = base[i % base.length];
-    const hp = 70 + (i % 5) * 15;
-    const attack = 35 + (i % 4) * 10;
-    const defense = 28 + (i % 4) * 8;
-    const speed = 22 + (i % 4) * 7;
-    out.push({
-      id: `emergency-${i + 1}`,
-      name: b.name,
-      image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${b.dex}.png`,
-      types: [b.type],
-      hp,
-      attack,
-      defense,
-      speed,
-      attacks: [
-        { name: "Investida", damage: 30, cost: ["Colorless"] },
-        { name: "Golpe Elemental", damage: 55, cost: [b.type, "Colorless"] }
-      ]
-    });
+const DECK_LIBRARY = {
+  "kanto-fire": {
+    id: "kanto-fire",
+    label: "Fogo de Kanto",
+    cards: [
+      { name: "Charmander", dex: 4, type: "fire", hp: 65, atk: 32, def: 24, spd: 30, stage: "basic", evolvesTo: "Charmeleon" },
+      { name: "Charmeleon", dex: 5, type: "fire", hp: 90, atk: 45, def: 34, spd: 43, stage: "stage1", evolvesFrom: "Charmander", evolvesTo: "Charizard" },
+      { name: "Charizard", dex: 6, type: "fire", hp: 130, atk: 80, def: 62, spd: 70, stage: "stage2", evolvesFrom: "Charmeleon" },
+      { name: "Vulpix", dex: 37, type: "fire", hp: 62, atk: 31, def: 22, spd: 33, stage: "basic", evolvesTo: "Ninetales" },
+      { name: "Ninetales", dex: 38, type: "fire", hp: 108, atk: 63, def: 51, spd: 65, stage: "stage1", evolvesFrom: "Vulpix" },
+      { name: "Growlithe", dex: 58, type: "fire", hp: 66, atk: 36, def: 28, spd: 34, stage: "basic", evolvesTo: "Arcanine" },
+      { name: "Arcanine", dex: 59, type: "fire", hp: 116, atk: 71, def: 56, spd: 60, stage: "stage1", evolvesFrom: "Growlithe" },
+      { name: "Ponyta", dex: 77, type: "fire", hp: 70, atk: 38, def: 30, spd: 36, stage: "basic", evolvesTo: "Rapidash" },
+      { name: "Rapidash", dex: 78, type: "fire", hp: 106, atk: 62, def: 50, spd: 64, stage: "stage1", evolvesFrom: "Ponyta" }
+    ]
+  },
+  "kanto-water": {
+    id: "kanto-water",
+    label: "Mar de Kanto",
+    cards: [
+      { name: "Squirtle", dex: 7, type: "water", hp: 68, atk: 30, def: 30, spd: 28, stage: "basic", evolvesTo: "Wartortle" },
+      { name: "Wartortle", dex: 8, type: "water", hp: 92, atk: 43, def: 44, spd: 38, stage: "stage1", evolvesFrom: "Squirtle", evolvesTo: "Blastoise" },
+      { name: "Blastoise", dex: 9, type: "water", hp: 132, atk: 78, def: 72, spd: 58, stage: "stage2", evolvesFrom: "Wartortle" },
+      { name: "Magikarp", dex: 129, type: "water", hp: 56, atk: 20, def: 18, spd: 25, stage: "basic", evolvesTo: "Gyarados" },
+      { name: "Gyarados", dex: 130, type: "water", hp: 124, atk: 82, def: 58, spd: 54, stage: "stage1", evolvesFrom: "Magikarp" },
+      { name: "Poliwag", dex: 60, type: "water", hp: 64, atk: 28, def: 24, spd: 29, stage: "basic", evolvesTo: "Poliwhirl" },
+      { name: "Poliwhirl", dex: 61, type: "water", hp: 90, atk: 44, def: 36, spd: 40, stage: "stage1", evolvesFrom: "Poliwag", evolvesTo: "Poliwrath" },
+      { name: "Poliwrath", dex: 62, type: "water", hp: 118, atk: 72, def: 62, spd: 50, stage: "stage2", evolvesFrom: "Poliwhirl" },
+      { name: "Lapras", dex: 131, type: "water", hp: 108, atk: 58, def: 52, spd: 46, stage: "basic" }
+    ]
+  },
+  "kanto-grass": {
+    id: "kanto-grass",
+    label: "Selva de Kanto",
+    cards: [
+      { name: "Bulbasaur", dex: 1, type: "grass", hp: 66, atk: 30, def: 28, spd: 26, stage: "basic", evolvesTo: "Ivysaur" },
+      { name: "Ivysaur", dex: 2, type: "grass", hp: 94, atk: 45, def: 42, spd: 38, stage: "stage1", evolvesFrom: "Bulbasaur", evolvesTo: "Venusaur" },
+      { name: "Venusaur", dex: 3, type: "grass", hp: 134, atk: 82, def: 70, spd: 56, stage: "stage2", evolvesFrom: "Ivysaur" },
+      { name: "Oddish", dex: 43, type: "grass", hp: 62, atk: 27, def: 24, spd: 24, stage: "basic", evolvesTo: "Gloom" },
+      { name: "Gloom", dex: 44, type: "grass", hp: 88, atk: 40, def: 36, spd: 33, stage: "stage1", evolvesFrom: "Oddish", evolvesTo: "Vileplume" },
+      { name: "Vileplume", dex: 45, type: "grass", hp: 116, atk: 66, def: 58, spd: 42, stage: "stage2", evolvesFrom: "Gloom" },
+      { name: "Bellsprout", dex: 69, type: "grass", hp: 64, atk: 29, def: 24, spd: 28, stage: "basic", evolvesTo: "Weepinbell" },
+      { name: "Weepinbell", dex: 70, type: "grass", hp: 90, atk: 43, def: 34, spd: 39, stage: "stage1", evolvesFrom: "Bellsprout", evolvesTo: "Victreebel" },
+      { name: "Victreebel", dex: 71, type: "grass", hp: 120, atk: 74, def: 58, spd: 50, stage: "stage2", evolvesFrom: "Weepinbell" }
+    ]
+  },
+  "kanto-electric": {
+    id: "kanto-electric",
+    label: "Choque de Kanto",
+    cards: [
+      { name: "Pichu", dex: 172, type: "electric", hp: 56, atk: 22, def: 18, spd: 30, stage: "basic", evolvesTo: "Pikachu" },
+      { name: "Pikachu", dex: 25, type: "electric", hp: 74, atk: 40, def: 30, spd: 48, stage: "stage1", evolvesFrom: "Pichu", evolvesTo: "Raichu" },
+      { name: "Raichu", dex: 26, type: "electric", hp: 112, atk: 72, def: 50, spd: 70, stage: "stage2", evolvesFrom: "Pikachu" },
+      { name: "Magnemite", dex: 81, type: "electric", hp: 64, atk: 34, def: 28, spd: 32, stage: "basic", evolvesTo: "Magneton" },
+      { name: "Magneton", dex: 82, type: "electric", hp: 98, atk: 60, def: 44, spd: 48, stage: "stage1", evolvesFrom: "Magnemite" },
+      { name: "Electabuzz", dex: 125, type: "electric", hp: 96, atk: 58, def: 40, spd: 56, stage: "basic" },
+      { name: "Voltorb", dex: 100, type: "electric", hp: 68, atk: 35, def: 28, spd: 46, stage: "basic", evolvesTo: "Electrode" },
+      { name: "Electrode", dex: 101, type: "electric", hp: 102, atk: 64, def: 48, spd: 66, stage: "stage1", evolvesFrom: "Voltorb" },
+      { name: "Jolteon", dex: 135, type: "electric", hp: 110, atk: 70, def: 52, spd: 72, stage: "basic" }
+    ]
   }
-  return out;
+};
+
+function buildDeckCard(base, idx, deckId) {
+  const hp = base.hp;
+  const attack = base.atk;
+  const defense = base.def;
+  const speed = base.spd;
+  const typeLabel = base.type === "electric" ? "Lightning" : base.type.charAt(0).toUpperCase() + base.type.slice(1);
+  return {
+    id: `${deckId}-${idx + 1}`,
+    name: base.name,
+    image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${base.dex}.png`,
+    types: [base.type],
+    hp,
+    attack,
+    defense,
+    speed,
+    stage: base.stage || "basic",
+    evolvesFrom: base.evolvesFrom || null,
+    evolvesTo: base.evolvesTo || null,
+    attacks: [
+      { name: "Golpe Rápido", damage: 24 + Math.round(attack * 0.14), cost: ["Colorless"] },
+      { name: "Golpe Forte", damage: 38 + Math.round(attack * 0.22), cost: [typeLabel, "Colorless"] }
+    ]
+  };
+}
+
+function getDeckTemplates(deckId) {
+  const deck = DECK_LIBRARY[deckId];
+  if (!deck) return [];
+  return deck.cards.map((card, idx) => buildDeckCard(card, idx, deckId));
+}
+
+function randomDeckOptions(count = 3) {
+  return shuffle(Object.keys(DECK_LIBRARY)).slice(0, count);
 }
 
 function instantiateCard(template, uid) {
@@ -130,6 +191,7 @@ function makeEmptyPlayer(name) {
     selectedAttackIndex: 0,
     energyPool: 0,
     hasAttackedThisTurn: false,
+    hasEvolvedThisTurn: false,
     knockouts: 0
   };
 }
@@ -219,14 +281,19 @@ function beginTurn(game, role, incrementRound) {
   if (incrementRound) game.turnNumber += 1;
   const player = game.players[role];
   player.hasAttackedThisTurn = false;
+  player.hasEvolvedThisTurn = false;
   player.energyPool += 1;
   const drawn = drawCards(game, role, 1);
   ensureActive(game, role);
   pushLog(game, `${player.name} iniciou o turno e comprou ${drawn} carta(s).`);
 }
 
-function createGame(player1Name, player2Name) {
-  const templates = shuffle(emergencyTemplates(16));
+function createGame(player1Name, player2Name, player1DeckId, player2DeckId, evolutionEnabled = true) {
+  const p1TemplatesRaw = getDeckTemplates(player1DeckId);
+  const p2TemplatesRaw = getDeckTemplates(player2DeckId);
+  const p1Templates = shuffle(p1TemplatesRaw.length ? p1TemplatesRaw : getDeckTemplates("kanto-fire"));
+  const p2Templates = shuffle(p2TemplatesRaw.length ? p2TemplatesRaw : getDeckTemplates("kanto-water"));
+
   const game = {
     players: {
       player1: makeEmptyPlayer(player1Name),
@@ -235,11 +302,11 @@ function createGame(player1Name, player2Name) {
     currentPlayer: "player1",
     turnNumber: 0,
     winner: null,
-    logs: []
+    logs: [],
+    settings: {
+      evolutionEnabled: Boolean(evolutionEnabled)
+    }
   };
-
-  const p1Templates = templates.slice(0, 8);
-  const p2Templates = templates.slice(8, 16);
 
   game.players.player1.deck = shuffle(p1Templates.map((card, idx) => instantiateCard(card, `p1-${idx + 1}-${randomToken()}`)));
   game.players.player2.deck = shuffle(p2Templates.map((card, idx) => instantiateCard(card, `p2-${idx + 1}-${randomToken()}`)));
@@ -277,6 +344,9 @@ function sanitizePlayer(game, role, viewerRole) {
 
 function sanitizeState(session, viewerRole) {
   const ready = Boolean(session.players.player1 && session.players.player2 && session.game);
+  const viewerDeckOptions = session.deckOptions?.[viewerRole] || [];
+  const selectedMine = session.selectedDeck?.[viewerRole] || null;
+  const selectedOther = session.selectedDeck?.[otherRole(viewerRole)] || null;
   return {
     code: session.code,
     role: viewerRole,
@@ -284,11 +354,25 @@ function sanitizeState(session, viewerRole) {
     currentPlayer: ready ? session.game.currentPlayer : "player1",
     turnNumber: ready ? session.game.turnNumber : 0,
     winner: ready ? session.game.winner : null,
+    settings: {
+      evolutionEnabled: ready
+        ? Boolean(session.game.settings?.evolutionEnabled)
+        : Boolean(session.settings?.evolutionEnabled ?? true)
+    },
     logs: ready ? session.game.logs : [],
     ranking: session.ranking || { player1Wins: 0, player2Wins: 0, draws: 0 },
     chat: (session.chat || []).slice(0, 80),
     typing: session.typing || { player1: false, player2: false },
     rematchVotes: session.rematchVotes || { player1: false, player2: false },
+    deckSelection: {
+      options: viewerDeckOptions.map((deckId) => ({
+        id: deckId,
+        label: DECK_LIBRARY[deckId]?.label || deckId
+      })),
+      selected: selectedMine,
+      myDeckReady: Boolean(selectedMine),
+      opponentDeckReady: Boolean(selectedOther)
+    },
     players: {
       player1: ready
         ? sanitizePlayer(session.game, "player1", viewerRole)
@@ -312,8 +396,17 @@ function ensureReady(session) {
   if (!session.players.player1 || !session.players.player2) {
     return "A sala precisa de dois jogadores.";
   }
+  if (!session.selectedDeck?.player1 || !session.selectedDeck?.player2) {
+    return "Ambos os jogadores precisam escolher um deck.";
+  }
   if (!session.game) {
-    session.game = createGame(session.players.player1.name, session.players.player2.name);
+    session.game = createGame(
+      session.players.player1.name,
+      session.players.player2.name,
+      session.selectedDeck.player1,
+      session.selectedDeck.player2,
+      session.settings?.evolutionEnabled ?? true
+    );
   }
   return null;
 }
@@ -393,6 +486,45 @@ function handleAction(session, role, action, payload = {}) {
     return null;
   }
 
+  if (action === "EVOLVE_ACTIVE") {
+    if (!game.settings?.evolutionEnabled) return "Regra de evolução está desativada nesta partida.";
+    if (player.hasEvolvedThisTurn) return "Você já evoluiu neste turno.";
+
+    const active = getActive(player);
+    if (!active) return "Sem carta ativa para evoluir.";
+
+    const target = player.hand.find((card) => card.uid !== active.uid && card.evolvesFrom === active.name);
+    if (!target) return "Nenhuma evolução disponível para a carta ativa.";
+
+    const oldActiveName = active.name;
+    const oldActiveUid = active.uid;
+    const oldIndex = player.hand.findIndex((c) => c.uid === oldActiveUid);
+    const targetIndex = player.hand.findIndex((c) => c.uid === target.uid);
+
+    if (oldIndex < 0 || targetIndex < 0) return "Falha ao evoluir carta ativa.";
+
+    const targetCard = player.hand[targetIndex];
+
+    targetCard.currentHp = Math.max(targetCard.currentHp, targetCard.hp - Math.max(0, active.hp - active.currentHp));
+    targetCard.energyAttached = clone(active.energyAttached);
+    targetCard.uid = oldActiveUid;
+
+    if (oldIndex > targetIndex) {
+      player.hand.splice(oldIndex, 1);
+      player.hand.splice(targetIndex, 1);
+    } else {
+      player.hand.splice(targetIndex, 1);
+      player.hand.splice(oldIndex, 1);
+    }
+
+    player.hand.push(targetCard);
+    player.activeCardId = targetCard.uid;
+    player.hasEvolvedThisTurn = true;
+
+    pushLog(game, `${player.name} evoluiu ${oldActiveName} para ${targetCard.name}.`);
+    return null;
+  }
+
   if (action === "END_TURN") {
     const next = otherRole(role);
     const incrementRound = next === "player1";
@@ -464,7 +596,18 @@ const server = http.createServer(async (req, res) => {
         ranking: { player1Wins: 0, player2Wins: 0, draws: 0 },
         chat: [],
         typing: { player1: false, player2: false },
-        rematchVotes: { player1: false, player2: false }
+        rematchVotes: { player1: false, player2: false },
+        deckOptions: {
+          player1: randomDeckOptions(3),
+          player2: []
+        },
+        selectedDeck: {
+          player1: null,
+          player2: null
+        },
+        settings: {
+          evolutionEnabled: true
+        }
       };
       session.chat.unshift(nowLog(`${name} criou a sala.`));
       sessions.set(code, session);
@@ -481,9 +624,12 @@ const server = http.createServer(async (req, res) => {
       const token = randomToken();
       const name = String(body.name || "Jogador 2").slice(0, 24) || "Jogador 2";
       session.players.player2 = { name, token };
-      session.game = createGame(session.players.player1.name, session.players.player2.name);
+      session.game = null;
       session.rematchVotes = { player1: false, player2: false };
       session.typing = { player1: false, player2: false };
+      session.deckOptions.player2 = randomDeckOptions(3);
+      session.selectedDeck.player1 = null;
+      session.selectedDeck.player2 = null;
       session.chat.unshift(nowLog(`${name} entrou na sala.`));
 
       return sendJson(res, 200, { code, token, role: "player2" });
@@ -507,7 +653,16 @@ const server = http.createServer(async (req, res) => {
       if (auth.role !== "player1") return sendJson(res, 403, { error: "Somente Player 1 pode iniciar nova partida." });
 
       if (!auth.session.players.player2) return sendJson(res, 409, { error: "Aguardando Player 2 entrar na sala." });
-      auth.session.game = createGame(auth.session.players.player1.name, auth.session.players.player2.name);
+      if (!auth.session.selectedDeck?.player1 || !auth.session.selectedDeck?.player2) {
+        return sendJson(res, 409, { error: "Ambos precisam escolher o deck antes de iniciar a partida." });
+      }
+      auth.session.game = createGame(
+        auth.session.players.player1.name,
+        auth.session.players.player2.name,
+        auth.session.selectedDeck.player1,
+        auth.session.selectedDeck.player2,
+        auth.session.settings?.evolutionEnabled ?? true
+      );
       auth.session.rematchVotes = { player1: false, player2: false };
       auth.session.typing = { player1: false, player2: false };
       auth.session.chat.unshift(nowLog(`${auth.session.players.player1.name} iniciou nova partida.`));
@@ -523,6 +678,31 @@ const server = http.createServer(async (req, res) => {
 
       const auth = findSessionByAuth(code, token);
       if (auth.error) return sendJson(res, 401, { error: auth.error });
+
+      if (action === "SELECT_DECK") {
+        const deckId = String(payload.deckId || "");
+        const ownOptions = auth.session.deckOptions?.[auth.role] || [];
+        if (!ownOptions.includes(deckId)) return sendJson(res, 409, { error: "Deck inválido para esse jogador." });
+        if (!auth.session.selectedDeck) auth.session.selectedDeck = { player1: null, player2: null };
+        auth.session.selectedDeck[auth.role] = deckId;
+        const author = auth.session.players[auth.role]?.name || auth.role;
+        auth.session.chat.unshift(nowLog(`${author} escolheu o deck.`));
+        auth.session.chat = auth.session.chat.slice(0, 80);
+        return sendJson(res, 200, sanitizeState(auth.session, auth.role));
+      }
+
+      if (action === "TOGGLE_EVOLUTION_RULE") {
+        if (auth.role !== "player1") return sendJson(res, 403, { error: "Somente Player 1 pode alterar a regra de evolução." });
+        if (!auth.session.settings) auth.session.settings = { evolutionEnabled: true };
+        auth.session.settings.evolutionEnabled = Boolean(payload.enabled);
+        if (auth.session.game) {
+          auth.session.game.settings = auth.session.game.settings || {};
+          auth.session.game.settings.evolutionEnabled = Boolean(payload.enabled);
+        }
+        auth.session.chat.unshift(nowLog(`Regra de evolução ${payload.enabled ? "ativada" : "desativada"} por ${auth.session.players.player1?.name || "Player 1"}.`));
+        auth.session.chat = auth.session.chat.slice(0, 80);
+        return sendJson(res, 200, sanitizeState(auth.session, auth.role));
+      }
 
       if (action === "CHAT") {
         const text = String(payload.text || "").trim();
@@ -553,7 +733,15 @@ const server = http.createServer(async (req, res) => {
         auth.session.chat = auth.session.chat.slice(0, 80);
 
         if (auth.session.rematchVotes.player1 && auth.session.rematchVotes.player2) {
-          auth.session.game = createGame(auth.session.players.player1.name, auth.session.players.player2.name);
+          const p1Deck = auth.session.selectedDeck?.player1 || auth.session.deckOptions?.player1?.[0];
+          const p2Deck = auth.session.selectedDeck?.player2 || auth.session.deckOptions?.player2?.[0];
+          auth.session.game = createGame(
+            auth.session.players.player1.name,
+            auth.session.players.player2.name,
+            p1Deck,
+            p2Deck,
+            auth.session.settings?.evolutionEnabled ?? true
+          );
           auth.session.rematchVotes = { player1: false, player2: false };
           auth.session.typing = { player1: false, player2: false };
           auth.session.chat.unshift(nowLog("Revanche iniciada."));

@@ -7,6 +7,9 @@ const el = {
   createRoomBtn: document.getElementById("createRoomBtn"),
   joinRoomBtn: document.getElementById("joinRoomBtn"),
   connectionInfo: document.getElementById("connectionInfo"),
+  deckOptions: document.getElementById("deckOptions"),
+  deckStatus: document.getElementById("deckStatus"),
+  evolutionRuleToggle: document.getElementById("evolutionRuleToggle"),
   statusText: document.getElementById("statusText"),
   turnText: document.getElementById("turnText"),
   turnBanner: document.getElementById("turnBanner"),
@@ -14,6 +17,7 @@ const el = {
   rematchBtn: document.getElementById("rematchBtn"),
   scoreboard: document.getElementById("scoreboard"),
   newGameBtn: document.getElementById("newGameBtn"),
+  evolveBtn: document.getElementById("evolveBtn"),
   attachEnergyBtn: document.getElementById("attachEnergyBtn"),
   attackBtn: document.getElementById("attackBtn"),
   endTurnBtn: document.getElementById("endTurnBtn"),
@@ -40,7 +44,8 @@ const state = {
   typingLocal: false,
   typingTimer: null,
   lastChatHead: "",
-  audioReady: false
+  audioReady: false,
+  audioCtx: null
 };
 
 function normalizeType(type) {
@@ -75,10 +80,7 @@ async function apiFetch(url, options = {}) {
     }
   }
 
-  if (!response.ok) {
-    throw new Error(body.error || `Erro HTTP ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(body.error || `Erro HTTP ${response.status}`);
   return body;
 }
 
@@ -93,8 +95,7 @@ function saveConnection() {
 function loadConnection() {
   try {
     const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return;
-    state.connection = JSON.parse(raw);
+    if (raw) state.connection = JSON.parse(raw);
   } catch {
     state.connection = null;
   }
@@ -126,6 +127,7 @@ function updateConnectionInfo() {
 
 function clearBoard() {
   el.scoreboard.innerHTML = "";
+  el.deckOptions.innerHTML = "";
   el.player1Active.innerHTML = "";
   el.player2Active.innerHTML = "";
   el.player1Hand.innerHTML = "";
@@ -240,6 +242,8 @@ function renderCard(card, opts = {}) {
       <li><strong>HP:</strong> ${card.currentHp}/${card.hp}</li>
       <li><strong>Atk:</strong> ${card.attack} | <strong>Def:</strong> ${card.defense} | <strong>Vel:</strong> ${card.speed}</li>
       <li><strong>Energia:</strong> ${card.energyAttached?.total || 0} (${energyByType})</li>
+      <li><strong>Evolui de:</strong> ${card.evolvesFrom || "-"}</li>
+      <li><strong>Evolui para:</strong> ${card.evolvesTo || "-"}</li>
     </ul>
     <ul class="attacks">${attacks || "<li>Sem ataques</li>"}</ul>
   `;
@@ -298,6 +302,29 @@ function renderScoreboard() {
       <strong>Empates na Sala:</strong> ${rank.draws}
     </div>
   `;
+}
+
+function renderDeckSelection() {
+  const ds = state.snapshot?.deckSelection;
+  if (!ds) {
+    el.deckOptions.innerHTML = "";
+    el.deckStatus.textContent = "Sem dados de deck.";
+    return;
+  }
+
+  el.deckOptions.innerHTML = "";
+  for (const deck of ds.options || []) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `deck-option ${deck.id === ds.selected ? "selected" : ""}`.trim();
+    btn.setAttribute("data-deck-id", deck.id);
+    btn.innerHTML = `<strong>${deck.label}</strong><br/><small>ID: ${deck.id}</small>`;
+    el.deckOptions.appendChild(btn);
+  }
+
+  const myReady = ds.myDeckReady ? "você já escolheu seu deck" : "você ainda não escolheu seu deck";
+  const oppReady = ds.opponentDeckReady ? "oponente pronto" : "oponente ainda escolhendo";
+  el.deckStatus.textContent = `${myReady}; ${oppReady}.`;
 }
 
 function renderAttackOptions() {
@@ -374,12 +401,22 @@ function renderControls() {
   const connected = Boolean(state.connection && state.snapshot);
   const mine = isMyTurn();
   const me = myPlayer();
-  const disabledByTurn = !connected || !mine || Boolean(state.snapshot?.winner);
+  const disabledByTurn = !connected || !state.snapshot?.ready || !mine || Boolean(state.snapshot?.winner);
+  const deckSel = state.snapshot?.deckSelection || {};
+  const bothDecksReady = Boolean(deckSel.myDeckReady && deckSel.opponentDeckReady);
 
-  el.newGameBtn.disabled = !connected || state.connection.role !== "player1";
+  el.newGameBtn.disabled = !connected || state.connection.role !== "player1" || !bothDecksReady;
+  el.evolveBtn.disabled = disabledByTurn || !(state.snapshot?.settings?.evolutionEnabled ?? true);
   el.attachEnergyBtn.disabled = disabledByTurn;
   el.attackBtn.disabled = disabledByTurn;
   el.endTurnBtn.disabled = disabledByTurn;
+
+  el.deckOptions.querySelectorAll("button").forEach((btn) => {
+    btn.disabled = Boolean(state.snapshot?.winner);
+  });
+
+  el.evolutionRuleToggle.disabled = !connected || state.connection.role !== "player1";
+  el.evolutionRuleToggle.checked = Boolean(state.snapshot?.settings?.evolutionEnabled ?? true);
 
   el.energyInfo.textContent = `Energia no pool: ${me?.energyPool ?? "-"}`;
   el.turnLockInfo.textContent = mine ? "Ações liberadas para você." : "Ações bloqueadas: aguarde seu turno.";
@@ -418,6 +455,7 @@ function render() {
   }
 
   renderScoreboard();
+  renderDeckSelection();
   renderActive("player1", el.player1Active);
   renderActive("player2", el.player2Active);
   renderHand("player1", el.player1Hand);
@@ -554,6 +592,14 @@ function onAttackClick(event) {
   sendAction("SELECT_ATTACK", { attackIndex });
 }
 
+function onDeckSelectClick(event) {
+  const btn = event.target.closest("[data-deck-id]");
+  if (!btn) return;
+  const deckId = btn.getAttribute("data-deck-id");
+  if (!deckId) return;
+  sendAction("SELECT_DECK", { deckId });
+}
+
 function sendChatMessage() {
   const text = (el.chatInput.value || "").trim();
   if (!text) return;
@@ -584,18 +630,24 @@ function bindEvents() {
   el.createRoomBtn.addEventListener("click", createRoom);
   el.joinRoomBtn.addEventListener("click", joinRoom);
   el.newGameBtn.addEventListener("click", startMatch);
+  el.evolveBtn.addEventListener("click", () => sendAction("EVOLVE_ACTIVE"));
   el.attachEnergyBtn.addEventListener("click", () => sendAction("ATTACH_ENERGY"));
   el.attackBtn.addEventListener("click", () => sendAction("ATTACK"));
   el.endTurnBtn.addEventListener("click", () => sendAction("END_TURN"));
   el.player1Hand.addEventListener("click", onHandClick);
   el.player2Hand.addEventListener("click", onHandClick);
   el.attackOptions.addEventListener("click", onAttackClick);
+  el.deckOptions.addEventListener("click", onDeckSelectClick);
   el.sendChatBtn.addEventListener("click", sendChatMessage);
   el.chatInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") sendChatMessage();
   });
   el.chatInput.addEventListener("input", onChatInputChange);
   el.rematchBtn.addEventListener("click", () => sendAction("REMATCH"));
+  el.evolutionRuleToggle.addEventListener("change", () => {
+    if (!state.connection || state.connection.role !== "player1") return;
+    sendAction("TOGGLE_EVOLUTION_RULE", { enabled: el.evolutionRuleToggle.checked });
+  });
 }
 
 async function bootstrap() {

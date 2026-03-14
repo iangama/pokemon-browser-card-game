@@ -30,6 +30,13 @@
       <div id="connectionInfo">Sem conexão de sala.</div>
     </section>
 
+    <section class="status-panel" id="deckPanel">
+      <h3>Seleção de Deck (Privada)</h3>
+      <label class="small-note"><input type="checkbox" id="evolutionRuleToggle" checked /> Regra opcional: permitir evolução na partida</label>
+      <div id="deckOptions" class="deck-options"></div>
+      <div id="deckStatus" class="small-note">Escolha um deck para jogar.</div>
+    </section>
+
     <section class="status-panel">
       <div id="statusText">Aguardando conexão.</div>
       <div id="turnText">Turno atual: -</div>
@@ -53,6 +60,7 @@
           <h3>Ações do Turno</h3>
           <div class="action-buttons">
             <button id="newGameBtn">Nova Partida</button>
+            <button id="evolveBtn">Evoluir</button>
             <button id="attachEnergyBtn">Anexar Energia</button>
             <button id="attackBtn" class="attack-btn">Atacar</button>
             <button id="endTurnBtn">Encerrar Turno</button>

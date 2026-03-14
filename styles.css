@@ -121,6 +121,27 @@ button {
   margin-top: 12px;
 }
 
+.deck-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.deck-option {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.55);
+  color: #e2e8f0;
+  padding: 8px 10px;
+  min-width: 180px;
+  text-align: left;
+}
+
+.deck-option.selected {
+  border-color: rgba(74, 222, 128, 0.85);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.45);
+}
+
 .connection-row {
   display: flex;
   gap: 8px;
@@ -253,6 +274,11 @@ button {
 #attachEnergyBtn {
   background: var(--info);
   color: #f8fafc;
+}
+
+#evolveBtn {
+  background: #14b8a6;
+  color: #042f2e;
 }
 
 .attack-btn {
