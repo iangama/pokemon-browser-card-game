@@ -101,6 +101,7 @@ button {
 .status-panel,
 .scoreboard,
 .log-panel,
+.social-panel,
 .history-panel,
 .action-panel,
 .attack-picker,
@@ -175,11 +176,17 @@ button {
   color: #fef08a;
 }
 
+.rematch-btn {
+  margin-top: 10px;
+  background: #22c55e;
+  color: #052e16;
+}
+
 .scoreboard {
   margin-top: 12px;
   padding: 10px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 240px;
   gap: 8px;
 }
 
@@ -188,6 +195,14 @@ button {
   border-radius: 12px;
   background: rgba(2, 6, 23, 0.5);
   line-height: 1.5;
+}
+
+.score-draws {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.02rem;
 }
 
 .battle-area {
@@ -371,6 +386,55 @@ button:disabled {
 .history-panel {
   margin-top: 14px;
   padding: 12px;
+}
+
+.social-panel {
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.chat-panel h3 {
+  margin: 0 0 8px;
+}
+
+.typing-indicator {
+  min-height: 18px;
+  color: #c4b5fd;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+#chatList {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+#chatList li {
+  margin: 4px 0;
+}
+
+.chat-input-row {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#chatInput {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(2, 6, 23, 0.45);
+  color: #e5e7eb;
+}
+
+#sendChatBtn {
+  background: #a855f7;
+  color: #f5f3ff;
 }
 
 .pass-overlay {

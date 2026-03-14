@@ -285,6 +285,10 @@ function sanitizeState(session, viewerRole) {
     turnNumber: ready ? session.game.turnNumber : 0,
     winner: ready ? session.game.winner : null,
     logs: ready ? session.game.logs : [],
+    ranking: session.ranking || { player1Wins: 0, player2Wins: 0, draws: 0 },
+    chat: (session.chat || []).slice(0, 80),
+    typing: session.typing || { player1: false, player2: false },
+    rematchVotes: session.rematchVotes || { player1: false, player2: false },
     players: {
       player1: ready
         ? sanitizePlayer(session.game, "player1", viewerRole)
@@ -380,6 +384,9 @@ function handleAction(session, role, action, payload = {}) {
       removeDefeatedActive(game, enemyRole);
       if (!game.players[enemyRole].activeCardId) {
         game.winner = role;
+        if (!session.ranking) session.ranking = { player1Wins: 0, player2Wins: 0, draws: 0 };
+        if (role === "player1") session.ranking.player1Wins += 1;
+        else session.ranking.player2Wins += 1;
         pushLog(game, `${player.name} venceu a partida.`);
       }
     }
@@ -453,8 +460,13 @@ const server = http.createServer(async (req, res) => {
           player1: { name, token },
           player2: null
         },
-        game: null
+        game: null,
+        ranking: { player1Wins: 0, player2Wins: 0, draws: 0 },
+        chat: [],
+        typing: { player1: false, player2: false },
+        rematchVotes: { player1: false, player2: false }
       };
+      session.chat.unshift(nowLog(`${name} criou a sala.`));
       sessions.set(code, session);
       return sendJson(res, 200, { code, token, role: "player1" });
     }
@@ -470,6 +482,9 @@ const server = http.createServer(async (req, res) => {
       const name = String(body.name || "Jogador 2").slice(0, 24) || "Jogador 2";
       session.players.player2 = { name, token };
       session.game = createGame(session.players.player1.name, session.players.player2.name);
+      session.rematchVotes = { player1: false, player2: false };
+      session.typing = { player1: false, player2: false };
+      session.chat.unshift(nowLog(`${name} entrou na sala.`));
 
       return sendJson(res, 200, { code, token, role: "player2" });
     }
@@ -493,6 +508,9 @@ const server = http.createServer(async (req, res) => {
 
       if (!auth.session.players.player2) return sendJson(res, 409, { error: "Aguardando Player 2 entrar na sala." });
       auth.session.game = createGame(auth.session.players.player1.name, auth.session.players.player2.name);
+      auth.session.rematchVotes = { player1: false, player2: false };
+      auth.session.typing = { player1: false, player2: false };
+      auth.session.chat.unshift(nowLog(`${auth.session.players.player1.name} iniciou nova partida.`));
       return sendJson(res, 200, sanitizeState(auth.session, auth.role));
     }
 
@@ -505,6 +523,44 @@ const server = http.createServer(async (req, res) => {
 
       const auth = findSessionByAuth(code, token);
       if (auth.error) return sendJson(res, 401, { error: auth.error });
+
+      if (action === "CHAT") {
+        const text = String(payload.text || "").trim();
+        if (!text) return sendJson(res, 409, { error: "Mensagem vazia." });
+        if (!auth.session.chat) auth.session.chat = [];
+        if (!auth.session.typing) auth.session.typing = { player1: false, player2: false };
+        const author = auth.session.players[auth.role]?.name || auth.role;
+        auth.session.typing[auth.role] = false;
+        auth.session.chat.unshift(nowLog(`${author}: ${text.slice(0, 280)}`));
+        auth.session.chat = auth.session.chat.slice(0, 80);
+        return sendJson(res, 200, sanitizeState(auth.session, auth.role));
+      }
+
+      if (action === "CHAT_TYPING") {
+        if (!auth.session.typing) auth.session.typing = { player1: false, player2: false };
+        auth.session.typing[auth.role] = Boolean(payload.typing);
+        return sendJson(res, 200, sanitizeState(auth.session, auth.role));
+      }
+
+      if (action === "REMATCH") {
+        if (!auth.session.game || !auth.session.game.winner) {
+          return sendJson(res, 409, { error: "A revanche só pode ser pedida após o fim da partida." });
+        }
+        if (!auth.session.rematchVotes) auth.session.rematchVotes = { player1: false, player2: false };
+        auth.session.rematchVotes[auth.role] = true;
+        const requester = auth.session.players[auth.role]?.name || auth.role;
+        auth.session.chat.unshift(nowLog(`${requester} pediu revanche.`));
+        auth.session.chat = auth.session.chat.slice(0, 80);
+
+        if (auth.session.rematchVotes.player1 && auth.session.rematchVotes.player2) {
+          auth.session.game = createGame(auth.session.players.player1.name, auth.session.players.player2.name);
+          auth.session.rematchVotes = { player1: false, player2: false };
+          auth.session.typing = { player1: false, player2: false };
+          auth.session.chat.unshift(nowLog("Revanche iniciada."));
+          auth.session.chat = auth.session.chat.slice(0, 80);
+        }
+        return sendJson(res, 200, sanitizeState(auth.session, auth.role));
+      }
 
       const readyErr = ensureReady(auth.session);
       if (readyErr) return sendJson(res, 409, { error: readyErr });

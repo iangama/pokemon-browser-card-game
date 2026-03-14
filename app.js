@@ -11,6 +11,7 @@ const el = {
   turnText: document.getElementById("turnText"),
   turnBanner: document.getElementById("turnBanner"),
   winnerText: document.getElementById("winnerText"),
+  rematchBtn: document.getElementById("rematchBtn"),
   scoreboard: document.getElementById("scoreboard"),
   newGameBtn: document.getElementById("newGameBtn"),
   attachEnergyBtn: document.getElementById("attachEnergyBtn"),
@@ -25,13 +26,21 @@ const el = {
   player2Active: document.getElementById("player2Active"),
   player1Hand: document.getElementById("player1Hand"),
   player2Hand: document.getElementById("player2Hand"),
-  battleLog: document.getElementById("battleLog")
+  battleLog: document.getElementById("battleLog"),
+  chatList: document.getElementById("chatList"),
+  typingIndicator: document.getElementById("typingIndicator"),
+  chatInput: document.getElementById("chatInput"),
+  sendChatBtn: document.getElementById("sendChatBtn")
 };
 
 const state = {
   connection: null,
   snapshot: null,
-  pollId: null
+  pollId: null,
+  typingLocal: false,
+  typingTimer: null,
+  lastChatHead: "",
+  audioReady: false
 };
 
 function normalizeType(type) {
@@ -123,6 +132,81 @@ function clearBoard() {
   el.player2Hand.innerHTML = "";
   el.attackOptions.innerHTML = "";
   el.battleLog.innerHTML = "";
+  el.chatList.innerHTML = "";
+  el.typingIndicator.textContent = "";
+  el.rematchBtn.hidden = true;
+}
+
+function ensureAudioContext() {
+  if (state.audioReady) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    state.audioCtx = new AudioCtx();
+    state.audioReady = true;
+  } catch {
+    state.audioReady = false;
+  }
+}
+
+function playMessageBeep() {
+  if (!state.audioReady || !state.audioCtx) return;
+  const ctx = state.audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = 880;
+  gain.gain.value = 0.0001;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  const now = ctx.currentTime;
+  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+  osc.start(now);
+  osc.stop(now + 0.2);
+}
+
+function canNotify() {
+  return typeof Notification !== "undefined" && Notification.permission === "granted";
+}
+
+async function ensureNotificationPermission() {
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission === "default") {
+    try {
+      await Notification.requestPermission();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function maybeNotifyIncomingMessage() {
+  const messages = state.snapshot?.chat || [];
+  const head = messages[0] || "";
+  if (!head) return;
+
+  if (!state.lastChatHead) {
+    state.lastChatHead = head;
+    return;
+  }
+
+  if (head === state.lastChatHead) return;
+
+  const myName = state.snapshot?.players?.[state.connection?.role || ""]?.name || "";
+  const isMine = myName && head.includes(`${myName}:`);
+  if (!isMine) {
+    playMessageBeep();
+    if (canNotify()) {
+      try {
+        new Notification("Nova mensagem na sala", { body: head });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  state.lastChatHead = head;
 }
 
 function renderCard(card, opts = {}) {
@@ -196,16 +280,22 @@ function renderHand(role, container) {
 function renderScoreboard() {
   const p1 = state.snapshot.players.player1;
   const p2 = state.snapshot.players.player2;
+  const rank = state.snapshot.ranking || { player1Wins: 0, player2Wins: 0, draws: 0 };
   el.scoreboard.innerHTML = `
     <div class="score-item">
       <strong>${p1.name}</strong><br/>
       Deck: ${p1.deckCount} | Mão: ${p1.handCount} | Descarte: ${p1.discardCount}<br/>
-      Energia Pool: ${p1.energyPool} | KOs: ${p1.knockouts}
+      Energia Pool: ${p1.energyPool} | KOs: ${p1.knockouts}<br/>
+      Ranking da Sala: ${rank.player1Wins} vitória(s)
     </div>
     <div class="score-item">
       <strong>${p2.name}</strong><br/>
       Deck: ${p2.deckCount} | Mão: ${p2.handCount} | Descarte: ${p2.discardCount}<br/>
-      Energia Pool: ${p2.energyPool} | KOs: ${p2.knockouts}
+      Energia Pool: ${p2.energyPool} | KOs: ${p2.knockouts}<br/>
+      Ranking da Sala: ${rank.player2Wins} vitória(s)
+    </div>
+    <div class="score-item score-draws">
+      <strong>Empates na Sala:</strong> ${rank.draws}
     </div>
   `;
 }
@@ -238,6 +328,22 @@ function renderLogs() {
     li.textContent = line;
     el.battleLog.appendChild(li);
   }
+}
+
+function renderChat() {
+  el.chatList.innerHTML = "";
+  const messages = state.snapshot?.chat || [];
+  for (const msg of messages) {
+    const li = document.createElement("li");
+    li.textContent = msg;
+    el.chatList.appendChild(li);
+  }
+
+  const typing = state.snapshot?.typing || {};
+  const opponent = opponentRole();
+  const oppTyping = Boolean(typing[opponent]);
+  const oppName = state.snapshot?.players?.[opponent]?.name || "Oponente";
+  el.typingIndicator.textContent = oppTyping ? `${oppName} está digitando...` : "";
 }
 
 function renderTurnSignal() {
@@ -278,6 +384,15 @@ function renderControls() {
   el.energyInfo.textContent = `Energia no pool: ${me?.energyPool ?? "-"}`;
   el.turnLockInfo.textContent = mine ? "Ações liberadas para você." : "Ações bloqueadas: aguarde seu turno.";
 
+  const rematchVotes = state.snapshot?.rematchVotes || { player1: false, player2: false };
+  const votesCount = Number(rematchVotes.player1) + Number(rematchVotes.player2);
+  const ended = Boolean(state.snapshot?.winner);
+  el.rematchBtn.hidden = !ended;
+  el.rematchBtn.disabled = !ended || Boolean(rematchVotes[state.connection?.role || ""]);
+  if (ended) {
+    el.rematchBtn.textContent = `Pedir Revanche (${votesCount}/2 pronto)`;
+  }
+
   el.player1Panel.classList.toggle("current", state.snapshot?.currentPlayer === "player1");
   el.player2Panel.classList.toggle("current", state.snapshot?.currentPlayer === "player2");
 }
@@ -309,6 +424,7 @@ function render() {
   renderHand("player2", el.player2Hand);
   renderAttackOptions();
   renderLogs();
+  renderChat();
   renderTurnSignal();
   renderControls();
 }
@@ -322,6 +438,7 @@ async function refreshState() {
     });
     const data = await apiFetch(`/api/session/state?${query.toString()}`);
     state.snapshot = data;
+    maybeNotifyIncomingMessage();
     render();
   } catch (error) {
     el.statusText.textContent = error.message;
@@ -335,6 +452,8 @@ function startPolling() {
 
 async function createRoom() {
   const name = (el.playerNameInput.value || "Jogador 1").trim();
+  ensureAudioContext();
+  await ensureNotificationPermission();
   try {
     const data = await apiFetch("/api/session/create", {
       method: "POST",
@@ -357,6 +476,8 @@ async function createRoom() {
 
 async function joinRoom() {
   const name = (el.playerNameInput.value || "Jogador 2").trim();
+  ensureAudioContext();
+  await ensureNotificationPermission();
   const code = (el.roomCodeInput.value || "").trim().toUpperCase();
   if (!code) {
     el.statusText.textContent = "Informe o código da sala.";
@@ -433,6 +554,32 @@ function onAttackClick(event) {
   sendAction("SELECT_ATTACK", { attackIndex });
 }
 
+function sendChatMessage() {
+  const text = (el.chatInput.value || "").trim();
+  if (!text) return;
+  sendAction("CHAT", { text });
+  setTyping(false);
+  el.chatInput.value = "";
+}
+
+function setTyping(value) {
+  if (!state.connection) return;
+  if (state.typingLocal === value) return;
+  state.typingLocal = value;
+  sendAction("CHAT_TYPING", { typing: value });
+}
+
+function onChatInputChange() {
+  const text = (el.chatInput.value || "").trim();
+  if (!text) {
+    setTyping(false);
+    return;
+  }
+  setTyping(true);
+  if (state.typingTimer) clearTimeout(state.typingTimer);
+  state.typingTimer = setTimeout(() => setTyping(false), 1500);
+}
+
 function bindEvents() {
   el.createRoomBtn.addEventListener("click", createRoom);
   el.joinRoomBtn.addEventListener("click", joinRoom);
@@ -443,6 +590,12 @@ function bindEvents() {
   el.player1Hand.addEventListener("click", onHandClick);
   el.player2Hand.addEventListener("click", onHandClick);
   el.attackOptions.addEventListener("click", onAttackClick);
+  el.sendChatBtn.addEventListener("click", sendChatMessage);
+  el.chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") sendChatMessage();
+  });
+  el.chatInput.addEventListener("input", onChatInputChange);
+  el.rematchBtn.addEventListener("click", () => sendAction("REMATCH"));
 }
 
 async function bootstrap() {

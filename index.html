@@ -35,6 +35,7 @@
       <div id="turnText">Turno atual: -</div>
       <div id="turnBanner" class="turn-banner">Conecte-se a uma sala para começar.</div>
       <div id="winnerText" class="winner"></div>
+      <button id="rematchBtn" class="rematch-btn" hidden>Pedir Revanche</button>
     </section>
 
     <section class="scoreboard" id="scoreboard"></section>
@@ -81,6 +82,18 @@
     <section class="log-panel">
       <h3>Log de Batalha</h3>
       <ul id="battleLog"></ul>
+    </section>
+
+    <section class="social-panel">
+      <div class="chat-panel">
+        <h3>Chat da Sala</h3>
+        <div id="typingIndicator" class="typing-indicator"></div>
+        <ul id="chatList"></ul>
+        <div class="chat-input-row">
+          <input id="chatInput" type="text" placeholder="Digite uma mensagem..." maxlength="280" />
+          <button id="sendChatBtn">Enviar</button>
+        </div>
+      </div>
     </section>
   </main>
 
