@@ -40,12 +40,17 @@ const el = {
 const state = {
   connection: null,
   snapshot: null,
+  prevSnapshot: null,
   pollId: null,
   typingLocal: false,
   typingTimer: null,
   lastChatHead: "",
   audioReady: false,
-  audioCtx: null
+  audioCtx: null,
+  evolveFlash: {
+    player1: false,
+    player2: false
+  }
 };
 
 function normalizeType(type) {
@@ -212,7 +217,7 @@ function maybeNotifyIncomingMessage() {
 }
 
 function renderCard(card, opts = {}) {
-  const { active = false, hidden = false, owner = "player1" } = opts;
+  const { active = false, hidden = false, owner = "player1", evolveFlash = false } = opts;
   const article = document.createElement("article");
 
   if (hidden) {
@@ -222,6 +227,7 @@ function renderCard(card, opts = {}) {
   }
 
   article.className = `card type-${normalizeType(card.types?.[0])} ${active ? "active" : ""}`.trim();
+  if (evolveFlash) article.classList.add("evolve-flash");
   article.setAttribute("data-owner", owner);
   article.setAttribute("data-card-uid", card.uid);
 
@@ -258,7 +264,11 @@ function renderActive(role, container) {
     container.innerHTML = "<p>Sem carta ativa.</p>";
     return;
   }
-  container.appendChild(renderCard(player.activeCard, { active: true, owner: role }));
+  container.appendChild(renderCard(player.activeCard, {
+    active: true,
+    owner: role,
+    evolveFlash: state.evolveFlash[role]
+  }));
 }
 
 function renderHand(role, container) {
@@ -467,6 +477,29 @@ function render() {
   renderControls();
 }
 
+function triggerEvolveFlash(role) {
+  state.evolveFlash[role] = true;
+  setTimeout(() => {
+    state.evolveFlash[role] = false;
+    render();
+  }, 900);
+}
+
+function detectEvolutionAnimation(prevSnap, nextSnap) {
+  if (!prevSnap || !nextSnap) return;
+  for (const role of ["player1", "player2"]) {
+    const prevActive = prevSnap.players?.[role]?.activeCard;
+    const nextActive = nextSnap.players?.[role]?.activeCard;
+    if (!prevActive || !nextActive) continue;
+
+    const sameSlot = prevActive.uid === nextActive.uid;
+    const changedName = prevActive.name !== nextActive.name;
+    if (sameSlot && changedName) {
+      triggerEvolveFlash(role);
+    }
+  }
+}
+
 async function refreshState() {
   if (!state.connection) return;
   try {
@@ -475,7 +508,9 @@ async function refreshState() {
       token: state.connection.token
     });
     const data = await apiFetch(`/api/session/state?${query.toString()}`);
+    state.prevSnapshot = state.snapshot ? JSON.parse(JSON.stringify(state.snapshot)) : null;
     state.snapshot = data;
+    detectEvolutionAnimation(state.prevSnapshot, state.snapshot);
     maybeNotifyIncomingMessage();
     render();
   } catch (error) {
