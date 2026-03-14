@@ -1,0 +1,12 @@
+{
+  "name": "pokemon-browser-card-game-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pokemon card game online with room-based turns",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

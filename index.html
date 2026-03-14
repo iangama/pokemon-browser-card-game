@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokémon Card Battle Online</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>Pokémon Card Battle Online</h1>
+        <p>Crie uma sala e jogue em turnos com outra pessoa</p>
+      </div>
+    </header>
+
+    <section class="status-panel connection-panel">
+      <div class="connection-row">
+        <input id="playerNameInput" type="text" placeholder="Seu nome" maxlength="24" />
+        <button id="createRoomBtn">Criar Sala (Player 1)</button>
+      </div>
+      <div class="connection-row">
+        <input id="roomCodeInput" type="text" placeholder="Código da sala" maxlength="8" />
+        <button id="joinRoomBtn">Entrar na Sala (Player 2)</button>
+      </div>
+      <div id="connectionInfo">Sem conexão de sala.</div>
+    </section>
+
+    <section class="status-panel">
+      <div id="statusText">Aguardando conexão.</div>
+      <div id="turnText">Turno atual: -</div>
+      <div id="turnBanner" class="turn-banner">Conecte-se a uma sala para começar.</div>
+      <div id="winnerText" class="winner"></div>
+    </section>
+
+    <section class="scoreboard" id="scoreboard"></section>
+
+    <section class="battle-area">
+      <div class="board-side" id="player2Panel">
+        <h2>Jogador 2</h2>
+        <div id="player2Active" class="active-slot"></div>
+        <h3>Mão</h3>
+        <div id="player2Hand" class="card-row"></div>
+      </div>
+
+      <div class="center-column">
+        <div class="action-panel">
+          <h3>Ações do Turno</h3>
+          <div class="action-buttons">
+            <button id="newGameBtn">Nova Partida</button>
+            <button id="attachEnergyBtn">Anexar Energia</button>
+            <button id="attackBtn" class="attack-btn">Atacar</button>
+            <button id="endTurnBtn">Encerrar Turno</button>
+          </div>
+          <div class="small-note" id="energyInfo">Energia: -</div>
+          <div class="small-note" id="turnLockInfo">Ações disponíveis no seu turno.</div>
+        </div>
+
+        <div class="attack-picker">
+          <h3>Ataques da Carta Ativa</h3>
+          <div id="attackOptions"></div>
+        </div>
+
+        <div class="legend">
+          <strong>Vantagens:</strong> água &gt; fogo, fogo &gt; grama, grama &gt; água, elétrico &gt; água
+        </div>
+      </div>
+
+      <div class="board-side" id="player1Panel">
+        <h2>Jogador 1</h2>
+        <div id="player1Active" class="active-slot"></div>
+        <h3>Mão</h3>
+        <div id="player1Hand" class="card-row"></div>
+      </div>
+    </section>
+
+    <section class="log-panel">
+      <h3>Log de Batalha</h3>
+      <ul id="battleLog"></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
