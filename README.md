@@ -103,3 +103,4 @@ Com `autoDeploy` ativo no Render, o deploy inicia automaticamente após o push.
 
 - No plano free do Render, o serviço pode entrar em sleep por inatividade.
 - Ao abrir o link novamente, ele acorda (pode levar alguns segundos no primeiro acesso).
+- https://pokemon-browser-card-game.onrender.com/ link da hospedagem do Render
